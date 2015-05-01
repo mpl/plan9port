@@ -62,6 +62,8 @@ struct Message
 	uchar	recursed;
 	uchar	level;
 	uint		replywinid;
+	uint	orig_index;
+	uint	thread_index;
 
 	/* header info */
 	char		*from;
@@ -175,6 +177,7 @@ extern	char		*srvname;
 extern	char		deleted[];
 extern	int		wctlfd;
 extern	int		shortmenu;
+extern	int		sortbythread;
 
 extern	CFsys	*mailfs;
 extern	CFsys	*acmefs;

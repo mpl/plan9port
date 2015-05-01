@@ -36,6 +36,7 @@ void		plumbshowthread(void*);
 void		plumbsendthread(void*);
 
 int			shortmenu;
+int			sortbythread;
 
 CFsys *mailfs;
 CFsys *acmefs;
@@ -43,7 +44,7 @@ CFsys *acmefs;
 void
 usage(void)
 {
-	fprint(2, "usage: Mail [-sS] [-n srvname] [-o outgoing] [mailboxname [directoryname]]\n");
+	fprint(2, "usage: Mail [-sSt] [-n srvname] [-o outgoing] [mailboxname [directoryname]]\n");
 	threadexitsall("usage");
 }
 
@@ -92,6 +93,7 @@ threadmain(int argc, char *argv[])
 		fprint(2, "warning: open plumb/showmail: %r\n");
 
 	shortmenu = 0;
+	sortbythread = 0;
 	srvname = "mail";
 	ARGBEGIN{
 	case 's':
@@ -99,6 +101,9 @@ threadmain(int argc, char *argv[])
 		break;
 	case 'S':
 		shortmenu = 2;
+		break;
+	case 't':
+		sortbythread = 1;
 		break;
 	case 'o':
 		outgoing = EARGF(usage());

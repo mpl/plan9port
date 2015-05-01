@@ -7,6 +7,8 @@
 #include <plumb.h>
 #include "dat.h"
 
+QLock l;
+
 enum
 {
 	DIRCHUNK = 32*sizeof(Dir)
@@ -420,8 +422,182 @@ info(Message *m, int ind, int ogf)
 	return i;
 }
 
+// strip both "Re: " and preppended mailing list tag, if any.
+static char *
+stripre(char *message)
+{
+	char *re = "Re: ";
+	int relen = strlen(re);
+	char *tmp = message;
+	char *pos;
+	
+	if (tmp[0] == '[') {
+		pos = strchr(tmp, ']');
+		if (pos != 0) 
+			tmp = pos + 2;
+	}
+	while(cistrncmp(tmp, re, relen) == 0) {
+		tmp += relen;
+		if (tmp[0] == '[') {
+			pos = strchr(tmp, ']');
+			if (pos != 0) 
+				tmp = pos + 2;
+		}
+	}
+
+	return tmp;
+}
+
+// qsort by subject and by orig_index if subjects are equal
+static int
+compar1(const void *first, const void *second)
+{
+	Message *msg1 = (Message *) first;
+	Message *msg2 = (Message *) second;
+	int n;
+
+	n = strcmp(stripre(msg1->subject), stripre(msg2->subject));
+	if (n == 0) {
+		return (msg1->orig_index < msg2->orig_index);
+	}
+	return n;
+}
+
+// qsort by thread_index and by orig_index if thread_indexes are equal
+static int
+compar2(const void *first, const void *second)
+{
+	Message *msg1 = (Message *) first;
+	Message *msg2 = (Message *) second;
+
+	if (msg1->thread_index == msg2->thread_index) 
+		return (msg1->orig_index > msg2->orig_index);
+	return (msg1->thread_index > msg2->thread_index);
+}
+
 void
-mesgmenu0(Window *w, Message *mbox, char *realdir, char *dir, int ind, CFid *fd, int onlyone, int dotail)
+sortbyconversation(Message *mbox)
+{
+	int i, mboxSize;
+	Message *m, *prev, *sorted;
+	
+	// find out nb of messages
+	m = mbox->head;
+	i = 0;
+	while (m != nil) {
+		i++;
+		m = m->next;
+	}
+	mboxSize = i;
+	if (mboxSize > 0) {
+		// build array of messages
+		sorted = malloc(mboxSize * sizeof(Message));
+		m = mbox->head;
+		i = 0;
+		while (m != nil) {
+			sorted[i] = *m;
+			sorted[i].orig_index = i++;
+			prev = m;
+			m = m->next;
+			// and delete original message from mbox
+			free(prev);
+		}
+		// sort by subject and orig_index
+		qsort(sorted, mboxSize, sizeof(Message), compar1);
+		
+		sorted[0].thread_index = sorted[0].orig_index;
+		for (i=1; i<mboxSize; i++) {
+			if (strcmp(stripre(sorted[i].subject), stripre(sorted[i-1].subject)) == 0) {
+				sorted[i].thread_index = sorted[i-1].thread_index;
+			} else {
+				sorted[i].thread_index = sorted[i].orig_index;
+			}
+		}
+		// sort by thread_index and orig_index
+		qsort(sorted, mboxSize, sizeof(Message), compar2);
+	
+		for (i=1; i<mboxSize-1; i++) {
+			sorted[i].prev = &sorted[i-1];
+			sorted[i].next = &sorted[i+1];
+		}
+		sorted[mboxSize-1].next = nil;
+		sorted[0].prev = nil;
+		if (mboxSize > 1) {
+			sorted[0].next = &sorted[1];
+			sorted[mboxSize-1].prev = &sorted[mboxSize-2];
+		}
+	
+		// replace the initial mbox with the sorted one
+		mbox->head = sorted;
+		mbox->tail = &sorted[mboxSize-1];
+	}
+}
+
+char* name2regexp(char *prefix, char *s);
+void mesgmenu0(Window *w, Message *mbox, char *realdir, char *dir, int ind, CFid *fd, int onlyone, int dotail, int dosort);
+
+void 
+moveconversationup(Window *w, Message *mbox, char *realdir, char *dir, int ind, CFid *fd, int dotail)
+{
+	int i, j, n;
+	Message *m, **conversation;
+	char *name, *tmp;
+	int ogf=0;
+
+	if(strstr(realdir, "outgoing") != nil)
+		ogf=1;
+		
+	m = mbox->tail->prev;
+	i = 0;
+	conversation = emalloc(sizeof(Message *));
+	while (m!= nil) {
+		/* erase all messages of the same conversation and keep track of them. 
+		   do not assume that the last one of a group is actually the last one
+		   in the whole mailbox, because some unordering sometimes happen. */
+		if (strcmp(stripre(mbox->tail->subject), stripre(m->subject)) == 0) {
+			conversation = erealloc(conversation, (i+1) * sizeof(Message *));
+			conversation[i] = m;
+			if(w->data == nil)
+				w->data = winopenfile(w, "data");				
+			tmp = name2regexp("", m->name);
+			if(winsetaddr(w, tmp, 1) &&
+			winsetaddr(w, ".,./.*\\n(\t.*\\n)*/", 1))
+				fswrite(w->data, "", 0);				
+			free(tmp);
+			i++;
+		}
+		m = m->prev;
+	}
+	/* print them all at the top */
+	n = i;
+	for (i=0; i<n; i++) {
+		m = conversation[i];
+		if (ind > 0)
+			tmp = smprint("%d-#0", 2 * i + 2);
+		else
+			tmp = smprint("%d-#0", i + 2);
+		winsetaddr(w, tmp, 1);
+		free(tmp);
+		/* cancel deleted, better safe than sorry */
+		m->deleted = 0;
+		for (j=0; j<ind; j++) 
+			fsprint(fd, "\t");
+		if(ind != 0)
+			fsprint(fd, "  ");
+		name = estrstrdup(dir, m->name);
+		tmp = info(m, ind, ogf);
+		fsprint(fd, "%s%s\n", name, tmp);
+		free(tmp);
+		if(dotail && m->tail)
+			mesgmenu0(w, m, realdir, name, ind+1, fd, 0, dotail, 0);
+		free(name);
+	}
+	free(conversation);
+	return;						
+}
+
+void
+mesgmenu0(Window *w, Message *mbox, char *realdir, char *dir, int ind, CFid *fd, int onlyone, int dotail, int dosort)
 {
 	int i;
 	Message *m;
@@ -430,6 +606,13 @@ mesgmenu0(Window *w, Message *mbox, char *realdir, char *dir, int ind, CFid *fd,
 
 	if(strstr(realdir, "outgoing") != nil)
 		ogf=1;
+
+	if (dosort) {
+		qlock(&l);
+		if (!onlyone) {
+			sortbyconversation(mbox);
+		}
+	}
 
 	/* show mail box in reverse order, pieces in forward order */
 	if(ind > 0)
@@ -446,7 +629,7 @@ mesgmenu0(Window *w, Message *mbox, char *realdir, char *dir, int ind, CFid *fd,
 		fsprint(fd, "%s%s\n", name, tmp);
 		free(tmp);
 		if(dotail && m->tail)
-			mesgmenu0(w, m, realdir, name, ind+1, fd, 0, dotail);
+			mesgmenu0(w, m, realdir, name, ind+1, fd, 0, dotail, 0);
 		free(name);
 		if(ind)
 			m = m->next;
@@ -455,13 +638,21 @@ mesgmenu0(Window *w, Message *mbox, char *realdir, char *dir, int ind, CFid *fd,
 		if(onlyone)
 			m = nil;
 	}
+	
+	if (dosort) {
+		if (onlyone) {
+			/* move to the top all the thread of the new incoming message */
+			moveconversationup(w, mbox, realdir, dir, ind, fd, dotail);
+		}
+		qunlock(&l);
+	}
 }
 
 void
 mesgmenu(Window *w, Message *mbox)
 {
 	winopenbody(w, OWRITE);
-	mesgmenu0(w, mbox, mbox->name, "", 0, w->body, 0, !shortmenu);
+	mesgmenu0(w, mbox, mbox->name, "", 0, w->body, 0, !shortmenu, sortbythread);
 	winclosebody(w);
 }
 
@@ -474,7 +665,7 @@ mesgmenunew(Window *w, Message *mbox)
 	winselect(w, "0", 0);
 	w->data = winopenfile(w, "data");
 	b = emalloc(sizeof(Biobuf));
-	mesgmenu0(w, mbox, mbox->name, "", 0, w->data, 1, !shortmenu);
+	mesgmenu0(w, mbox, mbox->name, "", 0, w->data, 1, !shortmenu, sortbythread);
 	free(b);
 	if(!mbox->dirty)
 		winclean(w);
