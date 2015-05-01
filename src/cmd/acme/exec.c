@@ -75,6 +75,7 @@ static Rune LEdit[] = { 'E', 'd', 'i', 't', 0 };
 static Rune LExit[] = { 'E', 'x', 'i', 't', 0 };
 static Rune LFont[] = { 'F', 'o', 'n', 't', 0 };
 static Rune LGet[] = { 'G', 'e', 't', 0 };
+static Rune LRefreshGo[] = { '.', 'g', 'o', 0 };
 static Rune LID[] = { 'I', 'D', 0 };
 static Rune LIncl[] = { 'I', 'n', 'c', 'l', 0 };
 static Rune LIndent[] = { 'I', 'n', 'd', 'e', 'n', 't', 0 };
@@ -106,6 +107,7 @@ Exectab exectab[] = {
 	{ LExit,		xexit,	FALSE,	XXX,		XXX		},
 	{ LFont,		fontx,	FALSE,	XXX,		XXX		},
 	{ LGet,		get,		FALSE,	TRUE,	XXX		},
+	{ LRefreshGo,		get,		FALSE,	TRUE,	XXX		},
 	{ LID,		id,		FALSE,	XXX,		XXX		},
 	{ LIncl,		incl,		FALSE,	XXX,		XXX		},
 	{ LIndent,		indent,	FALSE,	XXX,		XXX		},
