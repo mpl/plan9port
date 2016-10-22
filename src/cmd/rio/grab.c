@@ -197,7 +197,7 @@ selectwin(int release, int *shift, ScreenInfo *s)
 		e = &ev.xbutton;
 		switch (ev.type){
 		case ButtonPress:
-			if(e->button != Button3){
+			if(e->button != Button2){
 				ungrab(e);
 				return 0;
 			}
@@ -213,7 +213,7 @@ selectwin(int release, int *shift, ScreenInfo *s)
 			break;
 		case ButtonRelease:
 			ungrab(e);
-			if(e->button != Button3 || e->subwindow != w)
+			if(e->button != Button2 || e->subwindow != w)
 				return 0;
 			if(shift != 0)
 				*shift = (e->state&ShiftMask) != 0;

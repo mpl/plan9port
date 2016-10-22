@@ -98,11 +98,11 @@ button(XButtonEvent *e)
 		if(borderorient(c, e->x, e->y) != BorderUnknown){
 			switch (e->button){
 			case Button1:
-			case Button2:
+			case Button3:
 				reshape(c, e->button, pull, e);
 				return;
-			case Button3:
-				move(c, Button3);
+			case Button2:
+				move(c, Button2);
 				return;
 			default:
 				return;
@@ -124,7 +124,7 @@ button(XButtonEvent *e)
 			active(c);
 		}
 		return;
-	case Button2:
+	case Button3:
 		if(c){
 			XMapRaised(dpy, c->parent);
 			active(c);
@@ -134,7 +134,7 @@ button(XButtonEvent *e)
 		} else if(numvirtuals > 1 && (n = menuhit(e, &b2menu)) > -1) 
 				button2(n);
 		return;
-	case Button3:
+	case Button2:
 		break;
 	case Button4:
 		/* scroll up changes to previous virtual screen */
@@ -159,10 +159,10 @@ button(XButtonEvent *e)
 		spawn(s);
 		break;
 	case Reshape:
-		reshape(selectwin(1, 0, s), Button3, sweep, 0);
+		reshape(selectwin(1, 0, s), Button2, sweep, 0);
 		break;
 	case Move:
-		move(selectwin(0, 0, s), Button3);
+		move(selectwin(0, 0, s), Button2);
 		break;
 	case Delete:
 		shift = 0;
