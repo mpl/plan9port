@@ -24,16 +24,28 @@ enum
 /*static int pgdowncode = 0x69; */
 
 static void alttab(int shift);
+static void cyclevirtual();
+static void prevvirtual();
+static void nextvirtual();
 
 void
 keysetup(void)
 {
 	int i;
 	int tabcode = XKeysymToKeycode(dpy, XK_Tab);
+	int gravecode = XKeysymToKeycode(dpy, XK_grave);
+	int slashcode = XKeysymToKeycode(dpy, XK_slash);
+	int equalcode = XKeysymToKeycode(dpy, XK_equal);
 
 	for(i=0; i<num_screens; i++){
 		XGrabKey(dpy, tabcode, Mod1Mask, screens[i].root, 0, GrabModeSync, GrabModeAsync);
 		XGrabKey(dpy, tabcode, Mod1Mask|ShiftMask, screens[i].root, 0, GrabModeSync, GrabModeAsync);
+		XGrabKey(dpy, gravecode, Mod1Mask, screens[i].root, 0, GrabModeSync, GrabModeAsync);
+		XGrabKey(dpy, gravecode, Mod1Mask|ShiftMask, screens[i].root, 0, GrabModeSync, GrabModeAsync);
+		XGrabKey(dpy, slashcode, Mod1Mask, screens[i].root, 0, GrabModeSync, GrabModeAsync);
+		XGrabKey(dpy, slashcode, Mod1Mask|ShiftMask, screens[i].root, 0, GrabModeSync, GrabModeAsync);
+		XGrabKey(dpy, equalcode, Mod1Mask, screens[i].root, 0, GrabModeSync, GrabModeAsync);
+		XGrabKey(dpy, equalcode, Mod1Mask|ShiftMask, screens[i].root, 0, GrabModeSync, GrabModeAsync);
 	/*	XGrabKey(dpy, pgupcode, Mod1Mask, screens[i].root, 0, GrabModeSync, GrabModeAsync); */
 	/*	XGrabKey(dpy, pgdowncode, Mod1Mask, screens[i].root, 0, GrabModeSync, GrabModeAsync); */
 	/*	XGrabKey(dpy, altcode, 0, screens[i].root, 0, GrabModeSync, GrabModeAsync); */
@@ -46,9 +58,22 @@ keypress(XKeyEvent *e)
 	/*
 	 * process key press here
 	 */
+	if ((e->state&Mod1Mask) != (1<<3)) {
+		return;
+	}
 	int tabcode = XKeysymToKeycode(dpy, XK_Tab);
-	if(e->keycode == tabcode && (e->state&Mod1Mask) == (1<<3))
+	int gravecode = XKeysymToKeycode(dpy, XK_grave);
+	int slashcode = XKeysymToKeycode(dpy, XK_slash);
+	int equalcode = XKeysymToKeycode(dpy, XK_equal);
+	if (e->keycode == tabcode){
 		alttab(e->state&ShiftMask);
+	} else if (e->keycode == gravecode){
+		cyclevirtual();
+	} else if (e->keycode == slashcode){
+		prevvirtual();
+	} else if (e->keycode == equalcode){
+		nextvirtual();
+	}
 	XAllowEvents(dpy, SyncKeyboard, e->time);
 }
 
@@ -65,3 +90,39 @@ alttab(int shift)
 /*	fprintf(stderr, "%sTab\n", shift ? "Back" : ""); */
 }
 
+static void
+cyclevirtual()
+{
+	if(numvirtuals <= 0) {
+		return;
+	}
+	if (virt >= numvirtuals - 1) {
+		switch_to(0);
+		return;
+	}
+	switch_to(virt + 1);
+}
+
+static void
+prevvirtual()
+{
+	if(numvirtuals <= 0) {
+		return;
+	}
+	if (virt <= 0) {
+		return;
+	}
+	switch_to(virt - 1);
+}
+
+static void
+nextvirtual()
+{
+	if(numvirtuals <= 0) {
+		return;
+	}
+	if (virt >= numvirtuals - 1) {
+		return;
+	}
+	switch_to(virt + 1);
+}
